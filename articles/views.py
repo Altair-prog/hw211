@@ -1,0 +1,66 @@
+from django.urls.base import reverse
+from django.utils.text import slugify
+from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse_lazy
+from django.views.generic import CreateView, UpdateView, ListView, DetailView, DeleteView
+from articles.models import Article
+from django.contrib.auth.mixins import LoginRequiredMixin
+
+
+class ArticleCreateView(LoginRequiredMixin, CreateView):
+    model = Article
+    fields = ('title', 'description', 'photo', 'created_at', 'is_publication')
+    success_url = reverse_lazy('articles:article_list')
+
+    def form_valid(self, form):
+        form.instance.slug = slugify(form.instance.title)
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('articles:article_view', args=[self.object.pk])
+
+
+class ArticleUpdateView(LoginRequiredMixin, UpdateView):
+    model = Article
+    fields = ('title', 'description', 'photo', 'created_at', 'is_publication')
+    success_url = reverse_lazy('articles:article_list')
+
+    def get_success_url(self):
+        return reverse('articles:article_view', args=[self.object.pk])
+        #return self.object.get_absolute_url()
+
+
+class ArticleListView(ListView):
+    model = Article
+
+    def get_queryset(self):
+        return Article.objects.filter(is_publication=True)
+
+
+class ArticleDetailView(DetailView):
+    model = Article
+
+    def get_object(self, queryset=None):
+        self.object = super().get_object(queryset)
+        self.object.count_views += 1
+        self.object.save()
+        return self.object
+
+
+class ArticleDeleteView(LoginRequiredMixin, DeleteView):
+    model = Article
+    success_url = reverse_lazy('articles:article_list')
+
+
+def article_is_publication(request, pk):
+    article_item = get_object_or_404(Article, pk=pk)
+    if article_item.is_publication:
+        article_item.is_publication = False
+    else:
+        article_item.is_publication = True
+
+    article_item.save()
+
+    return redirect(reverse('articles:article_list'))
+
+
